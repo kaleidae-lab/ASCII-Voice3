@@ -1,12 +1,614 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ASCII starts to move. — ASCII-Voice3</title>
+    <meta name="theme-color" content="#0a0b0d" />
+    <title>声のミラー — ASCII Face</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Noto Sans Mono", monospace;
+        background: #0a0b0d;
+        color: #f1f5f1;
+        --ink: #f1f5f1;
+        --muted: #7c8a84;
+        --line: #26312d;
+        --panel: #101514;
+        --accent: #99f6c4;
+        --warning: #ffd28c;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { min-height: 100%; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 50% 35%, #13231c 0, transparent 38rem),
+          #0a0b0d;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      .app {
+        width: min(100%, 980px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 5vw, 3rem) 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 1rem;
+      }
+
+      .eyebrow {
+        margin: 0 0 0.6rem;
+        color: var(--accent);
+        font-size: 0.72rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.5rem, 4vw, 2.6rem);
+        font-weight: 500;
+        letter-spacing: -0.05em;
+      }
+
+      .intro {
+        max-width: 38rem;
+        margin: 0.8rem 0 0;
+        color: var(--muted);
+        font-size: 0.83rem;
+        line-height: 1.7;
+      }
+
+      .control-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+      }
+
+      .primary-button, .secondary-button {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.7rem 1rem;
+        background: var(--panel);
+        transition: border-color 160ms ease, background 160ms ease,
+          transform 160ms ease;
+      }
+
+      .primary-button {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #09110d;
+        font-weight: 700;
+      }
+
+      .primary-button:hover, .secondary-button:hover { transform: translateY(-1px); }
+      .primary-button:focus-visible, .secondary-button:focus-visible {
+        outline: 2px solid var(--warning);
+        outline-offset: 3px;
+      }
+
+      .secondary-button { color: var(--muted); font-size: 0.75rem; }
+      .secondary-button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+      .status {
+        min-height: 1.2rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .status[data-kind="error"] { color: var(--warning); }
+      .status[data-kind="active"] { color: var(--accent); }
+
+      .face-stage {
+        position: relative;
+        min-height: min(64vw, 34rem);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 1.25rem;
+        background: rgba(16, 21, 20, 0.82);
+        box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.2);
+      }
+
+      .face-stage::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.24;
+        background: repeating-linear-gradient(
+          0deg, transparent 0, transparent 3px, rgba(153, 246, 196, 0.06) 4px
+        );
+      }
+
+      #face {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        padding: 1.2rem;
+        color: var(--ink);
+        font-size: clamp(0.48rem, 1.55vw, 1.08rem);
+        line-height: 1.15;
+        letter-spacing: 0.08em;
+        white-space: pre;
+        text-align: left;
+        text-shadow: 0 0 0.8rem rgba(153, 246, 196, 0.18);
+        user-select: none;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.72rem;
+        text-align: center;
+      }
+
+      .debug {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.65rem;
+        padding: 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: 0.75rem;
+        background: rgba(16, 21, 20, 0.75);
+      }
+
+      .debug[hidden] { display: none; }
+      .metric { min-width: 0; }
+      .metric-label { display: block; color: var(--muted); font-size: 0.65rem; }
+      .metric-value { display: block; margin-top: 0.25rem; color: var(--accent); font-size: 0.83rem; }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        color: var(--muted);
+        font-size: 0.68rem;
+      }
+
+      @media (max-width: 620px) {
+        header { display: block; }
+        .control-row { margin-top: 1rem; }
+        .face-stage { min-height: 58vw; }
+        #face { letter-spacing: 0.02em; }
+        .debug { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        footer { display: block; line-height: 1.7; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <main class="app">
+      <header>
+        <div>
+          <p class="eyebrow">voice mirror / ascii-voice3</p>
+          <h1>声で動く、ASCIIフェイス</h1>
+          <p class="intro">マイクに向かって声を出してください。音量、ピッチ、声の明るさ、変化の速さが、顔の表情に変換されます。</p>
+        </div>
+        <button id="debug-toggle" class="secondary-button" type="button" aria-pressed="false" aria-controls="debug-panel">数値を表示</button>
+      </header>
+
+      <div class="control-row">
+        <button id="mic-button" class="primary-button" type="button">マイクを有効にする</button>
+        <p id="status" class="status" role="status" aria-live="polite">マイクを許可すると、顔が声を聴きはじめます。</p>
+      </div>
+
+      <section class="face-stage" aria-label="声に反応するASCIIフェイス">
+        <pre id="face" aria-label="ASCIIフェイス"></pre>
+      </section>
+      <p class="hint">声を止めると、顔はゆっくり眠りにつきます。</p>
+
+      <section id="debug-panel" class="debug" hidden aria-label="音響特徴量">
+        <div class="metric"><span class="metric-label">音量 RMS</span><span id="rms-value" class="metric-value">0.000</span></div>
+        <div class="metric"><span class="metric-label">ピッチ Hz</span><span id="pitch-value" class="metric-value">—</span></div>
+        <div class="metric"><span class="metric-label">重心 Hz</span><span id="centroid-value" class="metric-value">—</span></div>
+        <div class="metric"><span class="metric-label">フラックス</span><span id="flux-value" class="metric-value">0.000</span></div>
+        <div class="metric"><span class="metric-label">無音継続</span><span id="silence-value" class="metric-value">0 ms</span></div>
+        <div class="metric"><span class="metric-label">推定母音</span><span id="vowel-value" class="metric-value">あ</span></div>
+      </section>
+
+      <footer>
+        <span>音声はこのブラウザ内だけで解析されます。</span>
+        <span>外部ライブラリ / 外部送信なし</span>
+      </footer>
+    </main>
+
+    <script>
+      // ===== 音声解析部 =====
+      const faceElement = document.getElementById("face");
+      const micButton = document.getElementById("mic-button");
+      const debugToggle = document.getElementById("debug-toggle");
+      const debugPanel = document.getElementById("debug-panel");
+      const statusElement = document.getElementById("status");
+      const metricElements = {
+        rms: document.getElementById("rms-value"),
+        pitch: document.getElementById("pitch-value"),
+        centroid: document.getElementById("centroid-value"),
+        flux: document.getElementById("flux-value"),
+        silence: document.getElementById("silence-value"),
+        vowel: document.getElementById("vowel-value"),
+      };
+
+      const GRID_WIDTH = 40;
+      const GRID_HEIGHT = 21;
+      const SILENCE_THRESHOLD = 0.035;
+      const VOWELS = ["あ", "い", "う", "え", "お"];
+      const state = {
+        audioContext: null,
+        analyser: null,
+        stream: null,
+        source: null,
+        animationFrame: null,
+        timeData: null,
+        frequencyData: null,
+        previousSpectrum: null,
+        silenceStartedAt: null,
+        running: false,
+        features: {
+          rms: 0,
+          pitch: null,
+          centroid: 0,
+          flux: 0,
+          silenceMs: 0,
+          vowel: "あ",
+        },
+      };
+
+      const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+      const lerp = (from, to, amount) => from + (to - from) * amount;
+      const formatNumber = (value, digits = 0) => Number.isFinite(value) ? value.toFixed(digits) : "—";
+
+      function setStatus(message, kind = "") {
+        statusElement.textContent = message;
+        statusElement.dataset.kind = kind;
+      }
+
+      function calculateRms(samples) {
+        let sum = 0;
+        for (let index = 0; index < samples.length; index += 1) sum += samples[index] * samples[index];
+        return clamp(Math.sqrt(sum / samples.length));
+      }
+
+      // 自己相関による軽量なピッチ推定。声が弱い/周期性が低いときは null を返す。
+      function detectPitch(samples, sampleRate) {
+        const rms = calculateRms(samples);
+        if (rms < 0.012) return null;
+
+        const minLag = Math.max(2, Math.floor(sampleRate / 600));
+        const maxLag = Math.min(Math.floor(sampleRate / 70), Math.floor(samples.length / 2));
+        let bestLag = -1;
+        let bestCorrelation = 0;
+        const correlations = new Float32Array(maxLag + 1);
+
+        for (let lag = minLag; lag <= maxLag; lag += 1) {
+          let numerator = 0;
+          let leftEnergy = 0;
+          let rightEnergy = 0;
+          for (let index = 0; index < samples.length - lag; index += 1) {
+            const left = samples[index];
+            const right = samples[index + lag];
+            numerator += left * right;
+            leftEnergy += left * left;
+            rightEnergy += right * right;
+          }
+          const correlation = numerator / Math.sqrt((leftEnergy * rightEnergy) || 1);
+          correlations[lag] = correlation;
+          if (correlation > bestCorrelation) {
+            bestCorrelation = correlation;
+            bestLag = lag;
+          }
+        }
+
+        if (bestLag < 0 || bestCorrelation < 0.45) return null;
+        const previous = correlations[bestLag - 1] || bestCorrelation;
+        const next = correlations[bestLag + 1] || bestCorrelation;
+        const correction = 0.5 * (previous - next) / (previous - 2 * bestCorrelation + next || 1);
+        const period = bestLag + clamp(correction, -0.5, 0.5);
+        const pitch = sampleRate / period;
+        return pitch >= 70 && pitch <= 600 ? pitch : null;
+      }
+
+      function calculateSpectrumFeatures(spectrum, sampleRate, fftSize, previousSpectrum) {
+        let weightedFrequency = 0;
+        let totalEnergy = 0;
+        let fluxSum = 0;
+        const nyquist = sampleRate / 2;
+        const maxBin = Math.min(spectrum.length, Math.floor(8000 / nyquist * spectrum.length));
+
+        for (let index = 1; index < maxBin; index += 1) {
+          const magnitude = spectrum[index] / 255;
+          const frequency = index * sampleRate / fftSize;
+          if (frequency < 80) continue;
+          weightedFrequency += frequency * magnitude;
+          totalEnergy += magnitude;
+          fluxSum += Math.abs(magnitude - previousSpectrum[index]);
+        }
+
+        return {
+          centroid: totalEnergy ? weightedFrequency / totalEnergy : 0,
+          flux: clamp(fluxSum / Math.max(1, maxBin - 1)),
+        };
+      }
+
+      function bandEnergy(spectrum, sampleRate, fftSize, low, high) {
+        const lowBin = Math.max(1, Math.floor(low * fftSize / sampleRate));
+        const highBin = Math.min(spectrum.length - 1, Math.ceil(high * fftSize / sampleRate));
+        let total = 0;
+        for (let index = lowBin; index <= highBin; index += 1) total += (spectrum[index] / 255) ** 2;
+        return total / Math.max(1, highBin - lowBin + 1);
+      }
+
+      // フォルマントを厳密に解かず、低/中/高域の相対パワーから母音らしさを推定する。
+      function estimateVowel(spectrum, sampleRate, fftSize, rms, previousVowel) {
+        if (rms < SILENCE_THRESHOLD) return previousVowel;
+        const low = bandEnergy(spectrum, sampleRate, fftSize, 250, 700);
+        const mid = bandEnergy(spectrum, sampleRate, fftSize, 700, 1500);
+        const high = bandEnergy(spectrum, sampleRate, fftSize, 1500, 3000);
+        const total = low + mid + high || 1;
+        const lowRatio = low / total;
+        const midRatio = mid / total;
+        const highRatio = high / total;
+
+        if (highRatio > 0.42 && midRatio > 0.2) return "い";
+        if (lowRatio > 0.5 && midRatio < 0.22) return "う";
+        if (lowRatio > 0.4 && midRatio > 0.28) return "お";
+        if (midRatio > 0.34) return "え";
+        return "あ";
+      }
+
+      function updateFeatures(timestamp) {
+        if (!state.analyser || !state.timeData || !state.frequencyData) return;
+        state.analyser.getFloatTimeDomainData(state.timeData);
+        state.analyser.getByteFrequencyData(state.frequencyData);
+
+        const rawRms = calculateRms(state.timeData);
+        // 入力機器ごとの音量差を吸収し、声の反応に使う RMS を 0〜1 に整える。
+        const normalizedRms = clamp((rawRms - 0.008) / 0.16);
+        const rawPitch = detectPitch(state.timeData, state.audioContext.sampleRate);
+        const spectrum = calculateSpectrumFeatures(
+          state.frequencyData,
+          state.audioContext.sampleRate,
+          state.analyser.fftSize,
+          state.previousSpectrum,
+        );
+
+        if (normalizedRms <= SILENCE_THRESHOLD) {
+          if (state.silenceStartedAt === null) state.silenceStartedAt = timestamp;
+        } else {
+          state.silenceStartedAt = null;
+        }
+
+        const previous = state.features;
+        previous.rms = lerp(previous.rms, normalizedRms, 0.18);
+        previous.pitch = rawPitch === null
+          ? (previous.pitch === null ? null : lerp(previous.pitch, 0, 0.08))
+          : (previous.pitch === null ? rawPitch : lerp(previous.pitch, rawPitch, 0.18));
+        if (previous.pitch !== null && previous.pitch < 72) previous.pitch = null;
+        previous.centroid = lerp(previous.centroid, spectrum.centroid, 0.12);
+        previous.flux = lerp(previous.flux, spectrum.flux, 0.16);
+        previous.silenceMs = state.silenceStartedAt === null ? 0 : timestamp - state.silenceStartedAt;
+        previous.vowel = estimateVowel(
+          state.frequencyData,
+          state.audioContext.sampleRate,
+          state.analyser.fftSize,
+          previous.rms,
+          previous.vowel,
+        );
+
+        for (let index = 0; index < state.previousSpectrum.length; index += 1) {
+          state.previousSpectrum[index] = state.frequencyData[index] / 255;
+        }
+      }
+
+      // ===== マッピング部 =====
+      function pitchLevel(pitch) {
+        return pitch === null ? 0.45 : clamp((pitch - 90) / 210);
+      }
+
+      function centroidLevel(centroid) {
+        return clamp((centroid - 500) / 3200);
+      }
+
+      function drawText(grid, text, x, y) {
+        if (y < 0 || y >= grid.length) return;
+        for (let index = 0; index < text.length; index += 1) {
+          const column = x + index;
+          if (column >= 0 && column < GRID_WIDTH) grid[y][column] = text[index];
+        }
+      }
+
+      function drawCentered(grid, text, y, offset = 0) {
+        drawText(grid, text, Math.floor((GRID_WIDTH - text.length) / 2) + offset, y);
+      }
+
+      function makeMouth(vowel, opening) {
+        if (opening < 0.1) return ["         ", "  -------  "];
+        const shapes = {
+          "あ": ["   ___   ", "  /   \\  ", " |     | ", "  \\___/  "],
+          "い": ["  _____  ", "  \\___/  ", "   ---   "],
+          "う": ["   ___   ", "  (   )  ", "   ---   "],
+          "え": ["  _____  ", "  |___|  ", "   ---   "],
+          "お": ["   ___   ", "  (   )  ", "  \\___/  "],
+        };
+        const shape = shapes[vowel] || shapes["あ"];
+        if (opening < 0.3) return ["  -" + shape[shape.length - 1].slice(2, 7) + "-  "];
+        if (opening < 0.58) return shape.slice(-Math.min(2, shape.length));
+        return shape;
+      }
+
+      function renderFace(features, timestamp) {
+        const grid = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(" "));
+        const quietness = clamp((features.silenceMs - 2000) / 3000);
+        const brightness = centroidLevel(features.centroid);
+        const voiceEnergy = features.rms;
+        const pitch = pitchLevel(features.pitch);
+        const blink = Math.pow(Math.max(0, Math.sin(timestamp / 4300)), 26);
+        const eyeOpening = clamp((0.28 + brightness * 0.72) * (0.72 + voiceEnergy * 0.28) * (1 - quietness * 0.72) * (1 - blink * 0.9));
+        const jitterAmount = features.flux * 1.3;
+        const jitter = jitterAmount > 0.05 ? Math.round(Math.sin(timestamp / 70) * jitterAmount) : 0;
+
+        const outline = [
+          "        .-----------------.        ",
+          "      /                     \\      ",
+          "     /                       \\     ",
+          "    /                         \\    ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "   |                           |   ",
+          "    \\                         /    ",
+          "     \\                       /     ",
+          "      \\_____________________/      ",
+        ];
+        outline.forEach((line, index) => {
+          const offset = index > 2 && index < 17 ? jitter : 0;
+          drawText(grid, line, offset, index);
+        });
+
+        const browY = 5 - Math.round(pitch * 2);
+        const leftBrow = pitch > 0.62 ? "\\___" : pitch < 0.34 ? "___/" : "____";
+        const rightBrow = pitch > 0.62 ? "___/" : pitch < 0.34 ? "\\___" : "____";
+        drawText(grid, leftBrow, 11 + jitter, browY);
+        drawText(grid, rightBrow, 25 + jitter, browY);
+
+        const eyeCharacter = eyeOpening > 0.78 ? (brightness > 0.62 ? "*" : "O")
+          : eyeOpening > 0.48 ? (brightness > 0.5 ? "o" : "O")
+          : eyeOpening > 0.2 ? "-" : ".";
+        drawCentered(grid, "[" + eyeCharacter.repeat(3) + "]     [" + eyeCharacter.repeat(3) + "]", 8, jitter);
+
+        const mouthOpening = clamp(voiceEnergy * 1.15 + (features.vowel === "あ" ? 0.08 : 0));
+        const mouth = makeMouth(features.vowel, mouthOpening);
+        mouth.forEach((line, index) => drawCentered(grid, line, 11 + index, jitter));
+
+        const stateLabel = !state.running ? "MIC OFF"
+          : features.silenceMs > 3000 ? "SLEEP MODE"
+          : voiceEnergy > 0.1 ? "LISTENING"
+          : "READY";
+        drawCentered(grid, "[ " + stateLabel + " ]", 18, 0);
+        return grid.map((row) => row.join("")).join("\n");
+      }
+
+      function updateDebug(features) {
+        metricElements.rms.textContent = formatNumber(features.rms, 3);
+        metricElements.pitch.textContent = features.pitch === null ? "—" : formatNumber(features.pitch, 0);
+        metricElements.centroid.textContent = features.centroid > 0 ? formatNumber(features.centroid, 0) : "—";
+        metricElements.flux.textContent = formatNumber(features.flux, 3);
+        metricElements.silence.textContent = formatNumber(features.silenceMs, 0) + " ms";
+        metricElements.vowel.textContent = features.vowel;
+      }
+
+      // ===== 描画部 =====
+      function animate(timestamp) {
+        if (state.running) updateFeatures(timestamp);
+        faceElement.textContent = renderFace(state.features, timestamp);
+        updateDebug(state.features);
+        state.animationFrame = requestAnimationFrame(animate);
+      }
+
+      async function startMicrophone() {
+        if (state.running) {
+          stopMicrophone();
+          return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setStatus("このブラウザではマイク入力を利用できません。HTTPSまたはlocalhostで開いてください。", "error");
+          return;
+        }
+
+        micButton.disabled = true;
+        setStatus("マイクの許可を待っています…");
+        try {
+          state.stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+          });
+          state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          await state.audioContext.resume();
+          state.analyser = state.audioContext.createAnalyser();
+          state.analyser.fftSize = 2048;
+          state.analyser.smoothingTimeConstant = 0.08;
+          state.timeData = new Float32Array(state.analyser.fftSize);
+          state.frequencyData = new Uint8Array(state.analyser.frequencyBinCount);
+          state.previousSpectrum = new Float32Array(state.analyser.frequencyBinCount);
+          state.source = state.audioContext.createMediaStreamSource(state.stream);
+          state.source.connect(state.analyser);
+          state.running = true;
+          state.silenceStartedAt = performance.now();
+          micButton.textContent = "マイクを停止";
+          setStatus("聴いています。声を出して顔を動かしてみてください。", "active");
+        } catch (error) {
+          if (state.stream) state.stream.getTracks().forEach((track) => track.stop());
+          state.stream = null;
+          const message = error && error.name === "NotAllowedError"
+            ? "マイクが許可されませんでした。ブラウザのサイト設定から許可できます。"
+            : "マイクを開始できませんでした。HTTPSまたはlocalhostで開いているか確認してください。";
+          setStatus(message, "error");
+        } finally {
+          micButton.disabled = false;
+        }
+      }
+
+      function stopMicrophone() {
+        state.running = false;
+        if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+        state.animationFrame = null;
+        if (state.stream) state.stream.getTracks().forEach((track) => track.stop());
+        if (state.source) state.source.disconnect();
+        if (state.audioContext && state.audioContext.state !== "closed") state.audioContext.close();
+        state.stream = null;
+        state.source = null;
+        state.analyser = null;
+        state.audioContext = null;
+        state.timeData = null;
+        state.frequencyData = null;
+        state.previousSpectrum = null;
+        state.silenceStartedAt = null;
+        state.features = { rms: 0, pitch: null, centroid: 0, flux: 0, silenceMs: 0, vowel: "あ" };
+        micButton.textContent = "マイクを有効にする";
+        setStatus("停止しました。もう一度許可すると再開できます。");
+      }
+
+      debugToggle.addEventListener("click", () => {
+        const isVisible = debugToggle.getAttribute("aria-pressed") === "true";
+        debugToggle.setAttribute("aria-pressed", String(!isVisible));
+        debugToggle.textContent = isVisible ? "数値を表示" : "数値を隠す";
+        debugPanel.hidden = isVisible;
+      });
+      micButton.addEventListener("click", startMicrophone);
+      window.addEventListener("pagehide", stopMicrophone);
+      animate(0);
+    </script>
   </body>
 </html>
